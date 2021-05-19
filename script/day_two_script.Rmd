@@ -1,0 +1,15 @@
+---
+title: "Day Two"
+author: "[Andrew Stewart](https://ajstewartlang.netlify.app/)"
+date: "July 2021"
+output: 
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+```
