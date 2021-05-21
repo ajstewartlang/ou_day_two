@@ -12,6 +12,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
 ```
 
 # Simple Linear Regression
@@ -104,34 +105,7 @@ And calculate Pearson's r.
 rcorr(crime_filtered$Population, crime_filtered$Violent_Crimes)
 ```
 
-There is still a clear positive relationship (r=.69).  Let's build a linear model. The dataset contains a lot of data and each city appears a number of times (once each year). For our linear model, our observations need to be independent of each other so let's just focus on the year 2015. That way each city will just appear once.
-
-First we apply our filter.
-
-```{r}
-crime_filtered <- filter(crime_filtered, Year == 2015)
-```
-
-Then we build a plot. I'm using the layer `geom_text()` to plot the City names and set the check_overlap parameter to `TRUE` to ensure the labels don't overlap.
-
-```{r, warning=FALSE, message=FALSE}
-crime_filtered %>%
-  ggplot(aes(x = Population, y = Violent_Crimes, label = City)) + 
-  geom_point() + 
-  geom_text(nudge_y = 500, check_overlap = TRUE) + 
-  geom_smooth(method = "lm", se = FALSE) + 
-  xlim(0, 1800000) +
-  theme_minimal() +
-  theme(text = element_text(size = 13)) +
-  labs(x = "Population", 
-       y = "Violent Crimes")
-```
-
-This shows a clear positive linear relationship so let's work out Pearson's r.
-
-```{r}
-rcorr(crime_filtered$Population, crime_filtered$Violent_Crimes)
-```
+There is a clear positive relationship (r=.69).  Let's build a linear model.
 
 ## Model the Data
 
@@ -152,7 +126,7 @@ Let's use the `check_model()` function from the performance package to check the
 check_model(model2)
 ```
 
-Our dataset is small and so some of our diagnostic plots don't look great. We'll come back to the influential outlier (case 29) later - but for now let's use the `anova()` function to see if our model with Population as the predictor is better than the one using just the mean.
+These look ok. Let's use the `anova()` function to see if our model with Population as the predictor is better than the one using just the mean.
 
 ```{r}
 anova(model1, model2)
@@ -168,22 +142,24 @@ summary(model2)
 
 The intercept corresponds to where our regression line intercepts the y-axis, and the Population parameter corresponds to the slope of our line. We see that for every increase in population by 1 there is an extra 0.006963 increase in violent crime. 
 
-For a city with a population of about a million, there will be about 7907 Violent Crimes. We calculate this by multiplying the estimate of our predictor (0.006963) by 1,000,000 and then adding the intercept (944.3).  This gives us 7907.3 crimes - which tallys with what you see in our regression line above. We may have a few outliers - how would you figure out what those were? Try excluding any outliers you find and re-building your model.
+For a city with a population of about a million, there will be about 11,558 Violent Crimes. We calculate this by multiplying the estimate of our predictor (0.01093) by 1,000,000 and then adding the intercept (628.4).This gives us 11,558.4 crimes - which tallys with what you see in our regression line above. 
+
+But wait, can you think of anything wrong with the way we've built our model?
 
 ## Breakout Rooms
 
 You now have three tasks:<br>
-1. Check whether the same relationship holds for population size and robberies in 2015.<br>
-2. Are house prices predicted by the number of violent crimes in 2015?<br>
-3. Are house prices predicted by population size in 2015? 
+1. Check whether the same relationship holds for population size and robberies.<br>
+2. Are house prices predicted by the number of violent crimes?<br>
+3. Are house prices predicted by population size? 
 
 # Multiple Regression
 
-In standard multiple regression all the independent variables (IVs) are entered into the equation and evaluated for their contribution at the same time. Let’s work through a specific example.
+In standard multiple regression all the predictor variables are entered into the equation and evaluated for their contribution at the same time. Let’s work through a specific example.
 
 An educational psychologist conducted a study that investigated the psycholinguistic variables that contribute to spelling performance in primary school children aged between 7- and 9-years. The researcher presented children with 48 words that varied systematically according to certain features such as age of acquisition, word frequency, word length, and imageability. The psychologist wants to check whether performance on the test accurately reflected children’s spelling ability as estimated by a standardised spelling test. That is, the psychologist wants to check whether her test was appropriate.
 
-Children’s chronological age (in months) `(age)`, their reading age `(RA)`, their standardised reading age `(std_RA)`, and their standardised spelling score `(std_SPELL)` were chosen as predictor variables. The outcome variable was the percentage correct spelling `(corr_spell)` score attained by each child using the list of 48 words. 
+Children’s chronological age (in months) `(age)`, their reading age `(RA)`, their standardised reading age `(std_RA)`, and their standardised spelling score `(std_SPELL)` were chosen as predictors. The outcome variable was the percentage correct spelling `(corr_spell)` score attained by each child using the list of 48 words. 
 
 First we need to load the packages we need - the require function assumes they are already on your machine. If they are not, then you need to `install.packages ("packagename")` first:
 
