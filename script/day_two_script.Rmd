@@ -346,3 +346,325 @@ summary(steplimitsboth)
 ```
 
 You'll see that the same final model is arrived it in each case. We have three significant predictors.
+
+# ANOVA
+
+## Loading our Packages
+
+First of all, we need to load the three packages we will be using - they are `tidyverse`, `afex`, and `emmeans`. The `{afex}` package is the one we use for conducting ANOVA. We use the `{emmeans}` package for running follow-up tests on the ANOVA model that we will be building.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(afex)
+library(emmeans)
+```
+
+## One-way ANOVA
+
+We have 45 participants in a between participants design where we are interested in the effect of beverage consumed on ability on a motor task. Our experimental factor (beverage type) has 3 levels. These are Water vs. Single Espresso vs. Double Espresso, and Ability is our DV measured on a continuous scale. Let's read in our data.
+
+### Reading in our Data
+
+```{r, message=FALSE}
+my_data <- read_csv("https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/cond.csv")
+head(my_data)
+```
+
+We see that we have three variables, but our experimental variable `Condition` is not coded as a factor. Let's fix that...
+
+```{r}
+my_data_tidied <- my_data %>%
+  mutate(Condition = factor(Condition))
+head(my_data_tidied)
+```
+
+### Summarising our Data
+
+Let's work our some summary statistics and build a data visualisation next.
+
+```{r}
+my_data_tidied %>%
+  group_by(Condition) %>%
+  summarise(mean = mean(Ability), 
+            sd = sd(Ability))
+```
+
+### Visualising our Data
+
+```{r}
+set.seed(1234)
+my_data_tidied %>% 
+  ggplot(aes(x = Condition, y = Ability, colour = Condition)) +
+  geom_violin() +
+  geom_jitter(width = .1) +
+  guides(colour = FALSE) +
+  stat_summary(fun.data = "mean_cl_boot", colour = "black") +
+  theme_minimal() +
+  theme(text = element_text(size = 13)) 
+```
+
+We have built a visualisation where we have plotted the raw data points using the `geom_jitter()` function, and the shape of the distribution for each condition using the `geom_violin()` function. We have also added some summary data in the form of the Mean and Confidence Intervals around the Mean using the `stat_summary()` function. The `set.seed()` parameter ensures the random noise added to our jittered points is reproducible.
+
+### Building our ANOVA Model
+
+Let's now build our model using the `aov_4()` function in the `{afex}` package. The syntax for ANOVA models in `aov_4()` is: `aov_4(DV ~ IV + (1 | Participant), data = my_data_tidied)`. The `~` symbol means predicted by, the `(1 | Participant)` term corresponds to our random effect - we obviously can't test all the participants in the world so have taken just a random sample from this population. Finally, we need to specify what dataset we are using by making that clear in the `data = my_data_tidied` bit of the model. We are going to map the output of the `aov()` function onto a variable I'm calling `model`. This means that the ANOVA results will be stored in this variable and will allow us to access them later.
+
+```{r}
+model <- aov_4(Ability ~ Condition + (1 | Participant), data = my_data_tidied)
+```
+
+To get the output of the ANOVA, we can use the `summary()` function with our newly created `model`.
+
+### Interpreting the Model Output
+
+```{r}
+summary(model)
+```
+
+The effect size (ges) is generalised eta squared and for designs with more than one factor it can be a useful indicator of how much variance in the dependent variable can be explained by each factor (plus any interactions between factors).
+
+So, we there is an effect in our model - the F-value is pretty big and the *p*-value pretty small) but we can't know what's driving the difference yet. We need to run some pairwise comparisons using the `emmeans()` function to tell us what mean(s) differ(s) from what other mean(s). 
+
+```{r}
+emmeans(model, pairwise ~ Condition)
+```
+
+Note that the default adjustment for multiple comparisons is Tukey's. We can change that by adding an extra parameter to our model such as `adjust = "bonferonni"`. In this case, it doesn't make any difference to our comparisons.
+
+```{r}
+emmeans(model, pairwise ~ Condition, adjust = "bonferroni")
+```
+
+We found a significant effect of Beverage type (F (2,42) = 297.05, *p* < .001, generalised η2 = .93). Tukey comparisons revealed that the Water group performed significantly worse than the Single Espresso Group (*p* < .001), that the Water group performed significantly worse than the Double Espresso Group (*p* < .001), and that the Single Espresso Group performed significantly worse than the Double Espresso Group (*p* < .001).
+
+In other words, drinking some coffee improves motor performance relative to drinking water, and drinking a lot of coffee improves motor performance even more.
+
+## Repeated Measures ANOVA
+
+Let’s imagine we have an experiment where we asked 32 participants to learn how to pronounce words of differing levels of complexity - Very Easy, Easy, Hard, and Very Hard. They were presented with these words in an initial exposure phase. After a 30 minute break we tested participants by asking them to say the words out loud when they appeared on a computer screen. We recorded their times in seconds. We want to know whether there is a difference in their response times for each level of word complexity. 
+
+### Reading in our Data
+
+First we read in the data.
+```{r, message=FALSE}
+rm_data <- read_csv("https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/rm_data.csv")
+head(rm_data)
+```
+
+We can see from the `head()` function that Condition isn't yet coded as a factor. Let's fix that.
+```{r}
+rm_data_tidied <- rm_data %>%
+  mutate(Condition = factor(Condition))
+head(rm_data_tidied)
+```
+
+### Summarising our Data
+
+Let's generate the Mean and Standard Deviation for each of our four conditions.
+```{r}
+rm_data_tidied %>%
+  group_by(Condition) %>%
+  summarise(mean = mean(RT), sd = sd (RT))
+```
+
+### Visualising our Data
+
+And visualise the data - note here that I am using the `fct_reorder()` function to reorder the levels of our factor based on the RT. This can be useful to make our viusalisations more easily interpretable.
+
+```{r}
+rm_data_tidied %>%
+  ggplot(aes(x = fct_reorder(Condition, RT), y = RT, colour = Condition)) +
+  geom_violin() +
+  geom_jitter(width = .1) +
+  guides(colour = FALSE) +
+  stat_summary(fun.data = "mean_cl_boot", colour = "black") +
+  theme_minimal() +
+  theme(text = element_text(size = 13)) +
+  labs(x = "Condition", y = "RT (s)")
+```
+
+### Building our ANOVA Model
+
+We build our ANOVA model in a similar way as we did previously. Except in this case our random effect we define as `(1 + Condition | Participant)`. In order to capture the fact that our `Condition` is a repeated measures factor, we add it to the random effect term like this.
+
+```{r}
+rm_model <- aov_4(RT ~ Condition + (1 + Condition | Participant), data = rm_data_tidied)
+```
+
+### Interpreting the Model Output
+
+We extract the summary of our model in the same way we did for the between participants ANOVA.
+
+```{r}
+summary(rm_model)
+```
+
+With this option, we didn't get the effect size measure in our measure. We can generate that though by asking for our model to be presented in anova format using the `anova()` function.
+
+```{r}
+anova(rm_model)
+```
+
+The effect size is measured by ges and is the recommended effect size measure for repeated measures designs (Bakeman, 2005). Note the dfs in this output are always corrected as if there is a violation of sphericity (violated when the variances of the differences between all possible pairs of within-subject conditions (i.e., levels of the independent variable) are **not** equal) - to be conservative (and to avoid Type I errors) we might be better off to always choose these corrected dfs.
+
+From this, we can see we have effect of Condition. But we don't know where the differences lie between the different levels of our factor. So we use the `emmeans()` function to find that out. Here we will be using the Bonferroni correction for multiple comparisons.
+
+```{r}
+emmeans(rm_model, pairwise ~ Condition, adjust = "Bonferroni")
+```
+
+From the above we can see that all conditions differ from all other conditions, *apart* from the Easy vs. Very Easy comparison which is not significant.
+
+## Factorial ANOVA
+
+Imagine the case where we’re interested in the effect of positive vs. negative contexts on how quickly (in milliseconds) people respond to positive vs. negative sentences.  We think there might be a priming effect (i.e., people are quicker to respond to positive sentences after positive contexts vs. after negative contexts - and vice versa). So, we have two factors, each with two levels. This is what’s known as a full factorial design where every subject participates in every condition. In the following experiment we have 60 participants.
+
+### Reading in our Data
+
+```{r}
+factorial_data <- read_csv("https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/factorial_data.csv")
+head(factorial_data)
+```
+
+Again we see that our two experimental factors are not coded as factors so let's fix that.
+
+```{r}
+factorial_data_tidied <- factorial_data %>%
+  mutate(Sentence = factor(Sentence), Context = factor(Context))
+head(factorial_data_tidied)
+```
+
+### Summarising our Data
+
+Ler's generate some summary statistics - note, we sepcificy our two grouping variables in the `group_by()` function call.
+
+```{r}
+factorial_data_tidied %>%
+  group_by(Context, Sentence) %>%
+  summarise(mean_rt = mean(RT), 
+            sd_rt = sd(RT))
+```
+
+We have `NA` for two conditions suggesting we have missing data somewhere in our dataset. We're going to use a new package now, called `visdat`. It allows us to visualise our dataset using the `vis_dat()` function and to visualise missing data using the `vis_miss()` function.
+
+```{r}
+library(visdat)
+```
+
+```{r}
+vis_miss(factorial_data_tidied)
+```
+
+We can see in the above visualisation that we do indeed have some missing data. We need to tell R what we want it to do with that. We can use the `na.rm = TRUE` parameter to tell it we want missing data to be ignored.
+
+```{r}
+factorial_data_tidied %>%
+  group_by(Context, Sentence) %>%
+  summarise(mean_rt = mean(RT, na.rm = TRUE), sd_rt = sd(RT, na.rm = TRUE))
+```
+
+Now we have the summary statistics that we expect.
+
+### Visualising our Data
+
+We can use a modification of the `ggplot()` code we've used above to generate our visualisation. Note, I am filtering our the missing data using the `filter()` function before we start our plot.  I am also specifying that we're wanting to plot a combination of our two factors in the `aes()` definition using `Context:Sentence`. There are further things we could modify to improve the look of this graph. Can you figure out ways in which the labelling of the two factors could be clearer?
+
+```{r}
+factorial_data_tidied %>%
+  filter(!is.na(RT)) %>%
+  ggplot(aes(x = Context:Sentence, y = RT, colour = Context:Sentence)) +
+  geom_violin() +
+  geom_jitter(width = .1, alpha = .25) +
+  guides(colour = FALSE) +
+  stat_summary(fun.data = "mean_cl_boot", colour = "black") +
+  theme_minimal() +
+  theme(text = element_text(size = 13)) +
+  labs(x = "Context X Sentence", y = "RT (ms)")
+```
+
+### Building our ANOVA Model
+
+We have our data in long format where every row is one observation. We haven't done any data aggregation. The `aov_4()` function will do this for us as ANOVA models need to be built over means (not raw data).  
+
+Now we're going torun a ANOVA for our factorial design treating participants as a random effect using `aov_4()`. The syntax is very similar to what we ran previously, although this time you'll see we have a new term `Context * Sentence`. This term corresponds to two main effects, plus the interaction between them. It's shorthand for `Context + Sentence + Context:Sentence`. We also specify this in the random effect By setting `na.rm` to be TRUE, we are telling the analysis to ignore individual trials where there might be missing data - effectively this calculates the condition means over the data that is present (and ignores trials where it is missing).
+
+```{r, message=FALSE}
+model_subjects <- aov_4(RT ~ Context * Sentence + (1 + Context * Sentence | Subject), data = factorial_data_tidied, na.rm = TRUE)
+```
+
+We can generate the output using the `anova()` function as we did earlier.
+
+```{r}
+anova(model_subjects)
+```
+
+### Interpreting the Model Output
+
+Let's now interpret our ANOVA where we had participants as our random effect. We will set the error correction adjustment to equal `none` as only some of the comparisons actually make theoretical sense - these are the ones where we're comparing like with like - Sentences of the same type (Positive *or* Negative) preceded by one version of our Context factor vs. the other.
+
+```{r}
+emmeans(model_subjects, pairwise ~ Context * Sentence, adjust = "none")
+```
+
+The key comparisons are the `Negative Negative - Positive Negative` and the `Negative Positive - Positive Positive` ones. In the first case, we are comparing reaction times to Negative Sentences preceded by Negative vs. Positive Contexts, while in the second we are comparing reaction times to Positive Sentences preceded by Negative vs. Positive Contexts. We can manually correct for multiple comparisons (which in this case is 2) by multiplying the corresponding *p*-values by 2 (and putting a limit of 1 on the maximum *p*-value possible). In this case, the first key comparison is sigficant (*p* = .012) while the second is not. We might write up the results like:
+
+We conducted a 2 (Context: Positive vs. Negative) x 2 (Sentence: Positive vs. Negative) repeated measures ANOVA to investigate the influence of Context valence on reaction times to Sentences of Positive or Negative valence.  The ANOVA revealed no effect of Sentence (F < 1), no effect of Context (F(1, 59) = 3.18, *p* = .080, ηG2 =  .006), but an interaction between Sentence and Context (F(1, 59) = 4.60, *p* = .036, ηG2 = .009). 
+
+The interaction was interpreted by conducting Bonferroni-corrected pairwise companions.  These comparisons revealed that the interaction was driven by Negative Sentences being processed faster in Negative vs. Positive Contexts (1,474 ms. vs. 1,628 ms., t(118) = 2.78, *p* = .012) while Positive Sentences were read at similar speeds in Negative vs. Positive Contexts (1,595 ms. vs. 1,579 ms., t(118) = .284, *p* = 1).
+
+### Breakout Rooms
+
+I would now like you to work on the following questions in your rooms.
+
+#### Question 1
+
+Our first data file is called `ANOVA_data1.csv` and can be found here:
+
+https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/ANOVA_data1.csv
+
+24 participants responded to a word that was either common (i.e., high lexical frequency) or rare (i.e., low lexical frequency). This is our IV and is coded as 'high' vs. low'. Our DV is reaction time and is coded as 'RT'. Subject number is coded as 'Subject'. We want to know whether there is a difference between conditions (and if so, where that difference lies). Visualise the data, generate descriptives, and run the appropriate ANOVA to determine whether our independent variable (Condition) has an influence on our dependent variable (RT).
+
+#### Question 2
+
+Our second data file is called `ANOVA_data2.csv` and can be found here:
+
+https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/ANOVA_data2.csv
+
+These data are also from a reaction time experiment but with a slightly more complex design.48 participants responded to a word that differed in how frequent it was. This factor is between participants and we have four levels coded as 'very low', 'low', 'high', and 'very high'. Our DV is reaction time and is coded as 'RT'. Subject number is coded as 'Subject'. We want to know if there is a difference between our conditions (and if so, where that difference lies).
+
+#### Question 3
+
+Our third data file is called `ANOVA_data3.csv` and can be found here:
+
+https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/ANOVA_data3.csv
+
+These data are from a 2 x 2 repeated measures reaction time experiment. We were interested in how quickly participants could respond to images that were Large vs. Small and in Colour vs. Black & White. We expect that Large Colour images will be responded to more quickly than Small B & W images. We're not sure about Small Colour images and Large B & W images. We measured the response times of 24 participants responding to an image in each of these four conditions. We want to determine if there is a difference between our conditions (and if so, where that difference lies).
+
+#### Question 4
+
+Our fourth data file is called `ANOVA_data4.csv` and can be found here:
+
+https://raw.githubusercontent.com/ajstewartlang/11_glm_anova_pt1/master/data/ANOVA_data4.csv
+
+These data are from a 2 x 2 x 3 mixed design experiment where we measured people's response times to maths questions that were either Easy or Hard, and to which they had to respond either under Time Pressure or under No Time Pressure. These are our first two factors and are repeated measures (i.e., everyone saw all 4 conditions). Our third factor is between subjects and corresponds to whether our participants were in one of three groups. The groups were Psychology Students, Maths Students, and Arts Students.  We want to know where a participant's perfomance on the maths questions under time pressure vs. not under time pressure is influenced by which one of these three groups they belong to. Conduct the appropriate ANOVA to answer this question. Remember to start off with some data visualisation(s).
+
+### Answers
+
+#### Question 1
+
+The ANOVA should reveal an effect of Condition with F(1, 22) = 91.217. As there are just two levels to our factor, we don't need to run any follow up tests to know what's driving the effect. By looking at the descriptive statistics, we see that RT is 865 for our `high` condition and 1178 for our `low` condition.
+
+#### Question 2
+
+The ANOVA should reveal an effect of Condition with F(3, 44) = 203.21. To interpret this further we need to run follow up comparisons. Using the Bonferroni correction these should indicate that every level of Condition differs from every other level.
+
+#### Question 3
+
+The ANOVA should reveal a main effect of Size (F(1, 23) = 198.97), a main effect of Colour (F(1, 23) = 524.27), and an interaction between these two factors (F(1, 23) = 11.08). To interpret this interaction further we need to run follow up comparisons. Using the Bonferroni correction these should indicate that every level of Condition differs from every other level.
+
+#### Question 4
+
+This question is slightly trickier than the ones we've looked at so far. After you've built your ANOVA (remember to add only your repeated measures factors to your random effect term), you'll discover a significant 3-way interaction (F(2, 69) = 4.63). You'll need to break this down further - one possible approach would be to look at the interaction between Difficulty and Time Pressure *separately* for each level of our between group factor. In other words, you'd build one 2 x 2 ANOVA model for each of your Student Groups. If you do this, you'll see that the 2 x 2 interaction is not significant for the Arts group, nor the Maths group, but the interaction *is* significant for the Psychology group (F(1, 23) = 11.08)) - as too are the two main effects of Difficulty and Time Pressure. But as these two factors interact, the meaning in our data is in the interaction term (not just these two main effects). 
+
+So, the 3-way interaction was telling us that the 2-way interaction differed for at least one of our Groups (relative to the other Groups). We need to examine this 2-way interaction further for our Psychology group by conducting pairwise comparisons, exactly as you've done above. This will reveal that for our Psychology group, each condition differs significantly from the other conditions. It means that for Psychology students, the Hard problems take long under Time Pressure vs. under No Time Pressure, and the Easy problems take longer under Time Pressure vs. under No Time Pressure (but neither of these are as long as for Hard problems).
+
