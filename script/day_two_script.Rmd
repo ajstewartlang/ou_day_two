@@ -347,6 +347,23 @@ summary(steplimitsboth)
 
 You'll see that the same final model is arrived it in each case. We have three significant predictors.
 
+## Breakout Rooms
+
+Using the `crime_filtered` dataset from earlier, I would like you to build the appropriate regression model where house prices are predicted by Population, Robberies, and Assaults in the year 2000 (note that you will need to filter the `crime_filtered` dataset in order to select only the year 2000).
+
+```{r, echo=FALSE, eval=FALSE}
+crime_2000 <- crime_filtered %>%
+  filter(Year == 2000)
+
+model_null <- lm(House_price ~ 1, data = crime_2000)
+model_full <- lm(House_price ~ Population + Assaults + Robberies, data = crime_2000)
+  
+steplimitsboth <- step(model_null, scope = list (upper = model_full), direction = "both")
+summary(steplimitsboth)
+
+#check_model(model_full)
+```
+
 # ANOVA
 
 ## Loading our Packages
